@@ -1,7 +1,7 @@
 # brainfuck
 For now, i will only write the interpreter. 
 
-. Lexer: DOne.
+. Lexer: Done.
 
 . Virtual machine: To do.
 
