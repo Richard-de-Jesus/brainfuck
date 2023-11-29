@@ -1,2 +1,6 @@
 # brainfuck
-Writing a brainfuck interpreter and compiler in Rust.
+For now, i will only write the interpreter. 
+
+. Lexer: DOne.
+. Virtual machine: To do.
+. Compiler: To do.
