@@ -1,9 +1,7 @@
-#[allow(unused)]
-#[derive(Debug)]
-struct Data {
-    data: [u8; 30_000],
-    pointer: usize,
-}
+use std::io::stdin;
+
+
+const DATA_SIZE: usize = 30_000;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     RightAngle, // >
@@ -46,6 +44,39 @@ pub fn lexer(file: &str) -> Vec<Token> {
         }
     }
     output
+}
+
+pub fn execute(tokens: Vec<Token>) {
+    use Token as T;
+
+    let mut data = [0u8; DATA_SIZE];
+    let mut ptr = 0;
+
+
+    for tok in tokens {
+        
+        match tok {
+            T::Plus => { 
+                data[ptr] = data[ptr].wrapping_add(1); 
+            },
+            T::Minus => { 
+                data[ptr] = data[ptr].wrapping_sub(1); 
+            },
+            T::LeftAngle => ptr -= 1,
+            T::RightAngle => ptr +=1,
+            T::Dot => print!("{}", data[ptr] as char),
+            T::Comma => {
+                let mut input = String::new();
+                
+                stdin().read_line(&mut input)
+                    .expect("input error");
+
+                data[ptr] = input.bytes()
+                    .nth(0).unwrap();
+            }
+            _ => todo!("loops"),
+        };
+    }
 }
 
 #[cfg(test)]

@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+  "main",
+  "interpreter",
+]
+
+resolver = "2"
+
