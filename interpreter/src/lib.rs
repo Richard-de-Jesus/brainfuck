@@ -1,77 +1,114 @@
 use std::{io::stdin, collections::HashMap};
 
 const DATA_SIZE: usize = 30_000;
-
+#[derive(Debug)]
 pub struct Program {
     data: [u8; DATA_SIZE],
     ptr: usize,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
     RightAngle, // >
     LeftAngle,  // <
-    Plus,
-    Minus,
+    Plus(u8),
+    Minus(u8),
     Dot,
     Comma,
     OpenBrace,  // [
     CloseBrace, // ]
 }
+// optimize tokens, doing constant folding on 
+// Plus and Minus operations. example: 
+// Plus(1), Plus(1), Plus(1) becomes Plus(3). 
+#[allow(unused)]
+fn optimize(src: &Vec<Token>) -> Vec<Token> {
+    use Token as T;
+    let mut output = Vec::with_capacity(src.len() / 2);
 
-pub fn lexer(file: &str) -> Vec<Token> {
+    let mut idx = 0;
+    loop {
+        let mut value = 0;
+        if idx == src.len() {
+            break;
+        }
+
+        match src[idx] {
+            T::Plus(n) => {
+
+                while src[idx] == T::Plus(n) {
+                    value += 1;
+                    idx += 1;
+                }
+                output.push(T::Plus(value));
+            },
+            T::Minus(n) => {
+
+                while src[idx] == T::Minus(n) {
+                    value += 1;
+                    idx += 1;
+                }
+                output.push(T::Minus(value));
+            },
+            _ => { 
+                output.push(src[idx].clone());
+                idx += 1;
+            },
+        };
+    }
+    output
+}
+// take source and convert to tokens. if opt is true,
+// source will be optimized.
+pub fn lexer(file: &str, opt: bool) -> (Vec<Token>, Program) {
     use Token as T;
 
     let mut output = Vec::with_capacity(file.len());
 
     for ch in file.chars() {
-        // flag is set if char is 
-        // not a command
-        let mut flag = false;
 
         let token = match ch {
             '>' => T::RightAngle,
             '<' => T::LeftAngle,
-            '+' => T::Plus,
-            '-' => T::Minus,
+            '+' => T::Plus(1),
+            '-' => T::Minus(1),
             '.' => T::Dot,
             ',' => T::Comma,
             '[' => T::OpenBrace,
             ']' => T::CloseBrace,
             _ => {
-                flag = true;
-                T::Plus
+                continue;
             } 
             
         };
-        if !flag {
-            output.push(token);
-        }
+        output.push(token);
     }
-    output
+    if opt {
+        output = optimize(&output);
+    }
+
+    (output, Program {
+        data: [0u8; DATA_SIZE],
+        ptr: 0
+    })
 }
 
-pub fn execute(tokens: Vec<Token>) {
+pub fn execute((tokens, mut pg): (Vec<Token>, Program)) {
     use Token as T;
 
     let brace_list = build_brace_list(&tokens);
 
-    let mut pg = Program {
-        data: [0u8; DATA_SIZE],
-        ptr: 0
-    };
-
     let mut code_position = 0;
-     while code_position < tokens.len() {
+    while code_position < tokens.len() {
 
         match tokens[code_position] {
-            T::Plus => { 
+            T::Plus(n) => { 
                 pg.data[pg.ptr] = pg.data[pg.ptr]
-                    .wrapping_add(1); 
+                    .wrapping_add(n); 
             },
-            T::Minus => { 
+            T::Minus(n) => { 
                 pg.data[pg.ptr] = pg.data[pg.ptr]
-                    .wrapping_sub(1); 
+                    .wrapping_sub(n); 
             },
 
             T::LeftAngle => {
@@ -131,6 +168,11 @@ fn build_brace_list(input: &Vec<Token>) -> Braces {
     }
     brace_list
 }
+// recommend function, lexes source and executes.
+// if optimize is true, code will be optimized.
+pub fn run(source: &str, optimize: bool) {
+    execute(lexer(source, optimize));
+}
 
 #[cfg(test)]
 mod tests {
@@ -144,12 +186,27 @@ mod tests {
         foobar @$#²³£¬¢£ . , ";
 
         let expected = vec![
-            T::Plus, T::Minus,
+            T::Plus(1), T::Minus(1),
             T::LeftAngle, T::RightAngle,
             T::OpenBrace, T::CloseBrace,
             T::Dot, T::Comma,
         ];
 
-        assert_eq!(expected, lexer(source));
+        assert_eq!(expected, lexer(source, false).0);
+    }
+    #[test]
+    fn test_optimization() {
+        let source = "++++ ++++ -- -- -- . . \
+                      [++] wdkj";
+
+        let expected = vec![
+            T::Plus(8), T::Minus(6),
+            T::Dot, T::Dot,
+            T::OpenBrace, T::Plus(2),
+            T::CloseBrace,
+        ];
+
+        assert_eq!(expected, lexer(source, true).0);
+
     }
 }

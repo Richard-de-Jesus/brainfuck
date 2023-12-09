@@ -1,5 +1,5 @@
 
-hello world in brainfuck. for testing.
+hello world in brainfuck; for testing;
 
 ++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.
 
