@@ -3,6 +3,6 @@ For now, i will only write the interpreter.
 
 . Lexer: Done.
 
-. Virtual machine: Only loops are lacking now.
+. Virtual machine: Done.
 
 . Compiler: To do.

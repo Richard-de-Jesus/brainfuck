@@ -1,4 +1,4 @@
-use std::io::stdin;
+use std::{io::stdin, collections::HashMap};
 
 const DATA_SIZE: usize = 30_000;
 
@@ -51,31 +51,40 @@ pub fn lexer(file: &str) -> Vec<Token> {
     output
 }
 
-pub fn parse_loop(input: &Vec<Token>, data: Program) {
-
-
-
-}
-
 pub fn execute(tokens: Vec<Token>) {
     use Token as T;
+
+    let brace_list = build_brace_list(&tokens);
 
     let mut pg = Program {
         data: [0u8; DATA_SIZE],
         ptr: 0
     };
 
-    for tok in 0..tokens.len() {
-        
-        match tokens[tok] {
+    let mut code_position = 0;
+     while code_position < tokens.len() {
+
+        match tokens[code_position] {
             T::Plus => { 
-                pg.data[pg.ptr] = pg.data[pg.ptr].wrapping_add(1); 
+                pg.data[pg.ptr] = pg.data[pg.ptr]
+                    .wrapping_add(1); 
             },
             T::Minus => { 
-                pg.data[pg.ptr] = pg.data[pg.ptr].wrapping_sub(1); 
+                pg.data[pg.ptr] = pg.data[pg.ptr]
+                    .wrapping_sub(1); 
             },
-            T::LeftAngle => pg.ptr -= 1,
-            T::RightAngle => pg.ptr +=1,
+
+            T::LeftAngle => {
+                if pg.ptr > 0 {
+                    pg.ptr -= 1;
+                }
+            },
+            T::RightAngle => {
+                if pg.ptr < DATA_SIZE - 1 {
+                    pg.ptr += 1;
+                }
+            },
+
             T::Dot => print!("{}", pg.data[pg.ptr] as char),
             T::Comma => {
                 let mut input = String::new();
@@ -86,9 +95,41 @@ pub fn execute(tokens: Vec<Token>) {
                 pg.data[pg.ptr] = input.bytes()
                     .nth(0).unwrap();
             }
-            _ => todo!("loops"),
+
+            T::OpenBrace => {
+                if pg.data[pg.ptr] == 0 {
+                    code_position = brace_list[&code_position];
+                }
+            }
+            T::CloseBrace => {
+                if pg.data[pg.ptr] != 0 {
+                    code_position = brace_list[&code_position];
+                }
+            }
         };
+        code_position += 1;
     }
+}
+
+type Braces = HashMap<usize, usize>;
+fn build_brace_list(input: &Vec<Token>) -> Braces {
+
+    let mut temp_brace_stack = vec![];
+    let mut brace_list = HashMap::new();
+
+    for (index, command) in input.iter().enumerate() {
+
+        if *command == Token::OpenBrace {
+            temp_brace_stack.push(index);
+        }
+        if *command == Token::CloseBrace {
+            let start = temp_brace_stack.pop().unwrap();
+            
+            brace_list.insert(start, index);
+            brace_list.insert(index, start);
+        }
+    }
+    brace_list
 }
 
 #[cfg(test)]
