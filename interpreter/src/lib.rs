@@ -9,8 +9,8 @@ pub struct Program {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
-    RightAngle, // >
-    LeftAngle,  // <
+    RightAngle(u8), // >
+    LeftAngle(u8),  // <
     Plus(u8),
     Minus(u8),
     Dot,
@@ -18,38 +18,54 @@ pub enum Token {
     OpenBrace,  // [
     CloseBrace, // ]
 }
+
+macro_rules! optm {
+    ($src: ident $idx: ident $val: ident $tok: expr) => {
+
+        while $src[$idx] == $tok {
+            $val += 1;
+            $idx += 1;
+        }
+    };
+}
+
 // optimize tokens, doing constant folding on 
 // Plus and Minus operations. example: 
 // Plus(1), Plus(1), Plus(1) becomes Plus(3). 
-#[allow(unused)]
 fn optimize(src: &Vec<Token>) -> Vec<Token> {
     use Token as T;
     let mut output = Vec::with_capacity(src.len() / 2);
 
     let mut idx = 0;
+    let mut value: u8;
     loop {
-        let mut value = 0;
+        value = 0;
         if idx == src.len() {
             break;
         }
 
         match src[idx] {
-            T::Plus(n) => {
+            T::Plus(n) => {                
+                optm!(src idx value T::Plus(n));
 
-                while src[idx] == T::Plus(n) {
-                    value += 1;
-                    idx += 1;
-                }
                 output.push(T::Plus(value));
             },
             T::Minus(n) => {
+                optm!(src idx value T::Minus(n));
 
-                while src[idx] == T::Minus(n) {
-                    value += 1;
-                    idx += 1;
-                }
                 output.push(T::Minus(value));
             },
+
+            T::LeftAngle(n) => {
+                optm!(src idx value T::LeftAngle(n));
+
+                output.push(T::LeftAngle(value));
+            },
+            T::RightAngle(n) => {
+                optm!(src idx value T::RightAngle(n));
+
+                output.push(T::RightAngle(value));
+            }
             _ => { 
                 output.push(src[idx].clone());
                 idx += 1;
@@ -60,7 +76,7 @@ fn optimize(src: &Vec<Token>) -> Vec<Token> {
 }
 // take source and convert to tokens. if opt is true,
 // source will be optimized.
-pub fn lexer(file: &str, opt: bool) -> (Vec<Token>, Program) {
+pub fn lexer(file: &str, opt: bool) -> Vec<Token> {
     use Token as T;
 
     let mut output = Vec::with_capacity(file.len());
@@ -68,8 +84,8 @@ pub fn lexer(file: &str, opt: bool) -> (Vec<Token>, Program) {
     for ch in file.chars() {
 
         let token = match ch {
-            '>' => T::RightAngle,
-            '<' => T::LeftAngle,
+            '>' => T::RightAngle(1),
+            '<' => T::LeftAngle(1),
             '+' => T::Plus(1),
             '-' => T::Minus(1),
             '.' => T::Dot,
@@ -87,14 +103,16 @@ pub fn lexer(file: &str, opt: bool) -> (Vec<Token>, Program) {
         output = optimize(&output);
     }
 
-    (output, Program {
-        data: [0u8; DATA_SIZE],
-        ptr: 0
-    })
+    output
 }
 
-pub fn execute((tokens, mut pg): (Vec<Token>, Program)) {
+pub fn execute(tokens: Vec<Token>) {
     use Token as T;
+
+    let mut pg = Program {
+        data: [0u8; DATA_SIZE],
+        ptr: 0
+    };
 
     let brace_list = build_brace_list(&tokens);
 
@@ -111,14 +129,20 @@ pub fn execute((tokens, mut pg): (Vec<Token>, Program)) {
                     .wrapping_sub(n); 
             },
 
-            T::LeftAngle => {
-                if pg.ptr > 0 {
-                    pg.ptr -= 1;
+            T::LeftAngle(n) => {
+                let n = n as usize;
+                if pg.ptr >= n {
+                    pg.ptr -= n;
+                } else {
+                    panic!("tried to go below cell 0");
                 }
             },
-            T::RightAngle => {
-                if pg.ptr < DATA_SIZE - 1 {
-                    pg.ptr += 1;
+            T::RightAngle(n) => {
+                let n = n as usize;
+                if pg.ptr <= DATA_SIZE - n {
+                    pg.ptr += n;
+                } else {
+                    panic!("tried to go above cell {DATA_SIZE}");
                 }
             },
 
@@ -174,6 +198,32 @@ pub fn run(source: &str, optimize: bool) {
     execute(lexer(source, optimize));
 }
 
+// take tokens and convert to source code,
+// comments are not included, optimizations 
+// are going to reduce the source.
+pub fn tokens_to_source(tokens: Vec<Token>) -> String {
+    use Token as T;
+
+    let mut output = String::with_capacity(tokens.len());
+
+    let mut push_tok = |ch| {
+        output.push(ch);
+    };
+    for tok in tokens {
+        match tok {
+            T::Plus(_) => push_tok('+'),
+            T::Minus(_) => push_tok('-'),
+            T::LeftAngle(_) => push_tok('<'),
+            T::RightAngle(_) => push_tok('>'),
+            T::Dot => push_tok('.'),
+            T::Comma => push_tok(','),
+            T::OpenBrace => push_tok('['),
+            T::CloseBrace => push_tok(']'),
+        }
+    }
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,12 +237,12 @@ mod tests {
 
         let expected = vec![
             T::Plus(1), T::Minus(1),
-            T::LeftAngle, T::RightAngle,
+            T::LeftAngle(1), T::RightAngle(1),
             T::OpenBrace, T::CloseBrace,
             T::Dot, T::Comma,
         ];
 
-        assert_eq!(expected, lexer(source, false).0);
+        assert_eq!(expected, lexer(source, false));
     }
     #[test]
     fn test_optimization() {
@@ -206,7 +256,7 @@ mod tests {
             T::CloseBrace,
         ];
 
-        assert_eq!(expected, lexer(source, true).0);
+        assert_eq!(expected, lexer(source, true));
 
     }
 }
